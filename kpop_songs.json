@@ -50,3 +50,10 @@
   { "release_date": "2024-01-02", "title": "Sugar Rush Ride", "artist": "TXT", "generation": 4, "youtube": "https://youtu.be/OsrDv3K9G4M" },
   { "release_date": "2024-04-12", "title": "How Sweet", "artist": "NewJeans", "generation": 4, "youtube": "https://youtu.be/5e3rKInegeU" }
 ]
+
+function buildMapFromArray(arr){
+  mdMap.clear();
+  for (const s of arr){
+    const dateStr = s.release_date || s.date;  // sjednocení, když přijde starý JSON
+    if (!dateStr) continue;
+    const [y,m,d] = dateStr
