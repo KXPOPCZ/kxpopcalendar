@@ -137,4 +137,210 @@
       { "release_date": "2023-02-25", "title": "Attention", "artist": "NewJeans", "generation": 4, "youtube": "https://youtu.be/5nEpcTxGSF0" },
       { "release_date": "2023-05-08", "title": "Spicy", "artist": "aespa", "generation": 4, "youtube": "https://youtu.be/Os_heh8vPfs" },
       { "release_date": "2023-07-07", "title": "Super Shy", "artist": "NewJeans", "generation": 4, "youtube": "https://youtu.be/ArmDp-zijuc" },
-      { "release_date": "2023-07-21", "title": "ETA", "artist": "NewJeans", "generation": 4, "youtube": "https://
+      { "release_date": "2023-07-21", "title": "ETA", "artist": "NewJeans", "generation": 4, "youtube": "https://youtu.be/jOTfBlKSQYY" },
+      { "release_date": "2023-07-21", "title": "Cool With You", "artist": "NewJeans", "generation": 4, "youtube": "https://youtu.be/MijO3UXXd48" },
+      { "release_date": "2024-01-02", "title": "Sugar Rush Ride", "artist": "TXT", "generation": 4, "youtube": "https://youtu.be/OsrDv3K9G4M" },
+      { "release_date": "2024-04-12", "title": "How Sweet", "artist": "NewJeans", "generation": 4, "youtube": "https://youtu.be/5e3rKInegeU" }
+    ];
+
+    // Mapa datum => seznam písní v ten den
+    let mdMap = new Map();
+
+    // Sjednotit data do mapy
+    function buildMapFromArray(arr){
+      mdMap.clear();
+      for (const s of arr){
+        const dateStr = s.release_date || s.date;
+        if (!dateStr) continue;
+        // Převeď string na Date
+        let d = new Date(dateStr + "T00:00:00");
+        if (isNaN(d)) continue;
+        // Formát YYYY-MM-DD jako klíč
+        let key = d.toISOString().slice(0,10);
+        if (!mdMap.has(key)) mdMap.set(key, []);
+        mdMap.get(key).push(s);
+      }
+    }
+
+    // Render kalendáře podle aktuálního měsíce a vybrané generace
+    let viewDate = new Date();
+    viewDate.setDate(1);
+
+    function renderCalendar(date){
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      const monthLabel = document.getElementById("monthLabel");
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      monthLabel.textContent = date.toLocaleString("cs-CZ", { month: "long", year: "numeric" });
+
+      // Počáteční den v týdnu (pondělí=1, neděle=7)
+      const firstDayWeekday = (new Date(year, month, 1).getDay() + 6) % 7 + 1;
+      // Počet dní v měsíci
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      // Naplnit dny před měsícem (neaktivní)
+      for(let i=1; i<firstDayWeekday; i++){
+        const div = document.createElement("div");
+        div.className = "day inactive";
+        grid.appendChild(div);
+      }
+
+      // Přidat dny aktuálního měsíce
+      for(let day=1; day<=daysInMonth; day++){
+        const div = document.createElement("div");
+        div.className = "day";
+        const dateKey = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+        div.dataset.date = dateKey;
+
+        // Přidat číslo dne
+        const spanNum = document.createElement("span");
+        spanNum.className = "num";
+        spanNum.textContent = day;
+        div.appendChild(spanNum);
+
+        // Přidat značku pokud je písnička
+        const songsOnDay = mdMap.get(dateKey) || [];
+        if (songsOnDay.length > 0) {
+          const marker = document.createElement("span");
+          marker.className = "marker";
+          div.appendChild(marker);
+        }
+
+        // Označit dnešní den
+        const now = new Date();
+        if (dateKey === now.toISOString().slice(0,10)){
+          div.classList.add("today");
+        }
+
+        grid.appendChild(div);
+      }
+    }
+
+    // Zobraz info o písních na vybraný den
+    function showSongsOnDate(dateStr){
+      const panelTitle = document.getElementById("panelTitle");
+      const panelMeta = document.getElementById("panelMeta");
+      const songList = document.getElementById("songList");
+
+      panelTitle.textContent = dateStr;
+      const songsOnDay = mdMap.get(dateStr) || [];
+      songList.innerHTML = "";
+
+      if (songsOnDay.length === 0) {
+        panelMeta.textContent = "Žádné písně v tento den.";
+        return;
+      }
+
+      panelMeta.textContent = `Počet písní: ${songsOnDay.length}`;
+      for (const song of songsOnDay){
+        const songDiv = document.createElement("div");
+        songDiv.className = "song";
+        songDiv.setAttribute("role","listitem");
+
+        songDiv.innerHTML = `
+          <div class="left">${song.generation}G</div>
+          <div>
+            <div class="title"><a href="${song.youtube}" target="_blank" rel="noopener noreferrer">${song.title}</a></div>
+            <div class="meta">${song.artist}</div>
+          </div>
+        `;
+        songList.appendChild(songDiv);
+      }
+    }
+
+    // Filtrování podle generace
+    function filterSongsByGen(gen){
+      if (gen === "all") return songs;
+      const numGen = Number(gen);
+      return songs.filter(s => s.generation === numGen);
+    }
+
+    // Aktualizace zobrazení po výběru generace
+    function updateView(){
+      const genSelect = document.getElementById("genSelect");
+      const gen = genSelect.value;
+      const filtered = filterSongsByGen(gen);
+      buildMapFromArray(filtered);
+      renderCalendar(viewDate);
+      // Vyčistit panel
+      const panelTitle = document.getElementById("panelTitle");
+      const panelMeta = document.getElementById("panelMeta");
+      const songList = document.getElementById("songList");
+      panelTitle.textContent = "Vyber den";
+      panelMeta.textContent = "Vyber datum v kalendáři vlevo.";
+      songList.innerHTML = "";
+    }
+
+    // Inicializace
+    document.addEventListener("DOMContentLoaded", () => {
+      buildMapFromArray(songs);
+      renderCalendar(viewDate);
+
+      // Klik na den v kalendáři
+      document.getElementById("grid").addEventListener("click", (e) => {
+        if (!e.target.closest(".day") || e.target.closest(".day").classList.contains("inactive")) return;
+        const dayDiv = e.target.closest(".day");
+        showSongsOnDate(dayDiv.dataset.date);
+      });
+
+      // Ovládání měsíce
+      document.getElementById("prev").addEventListener("click", () => {
+        viewDate.setMonth(viewDate.getMonth() - 1);
+        updateView();
+      });
+      document.getElementById("next").addEventListener("click", () => {
+        viewDate.setMonth(viewDate.getMonth() + 1);
+        updateView();
+      });
+
+      // Výběr generace
+      document.getElementById("genSelect").addEventListener("change", () => {
+        updateView();
+      });
+
+      // Import JSON
+      document.getElementById("fileInput").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const imported = JSON.parse(ev.target.result);
+            if (Array.isArray(imported)) {
+              songs = imported;
+              updateView();
+            } else {
+              alert("Soubor neobsahuje platné pole písní.");
+            }
+          } catch {
+            alert("Chyba při čtení JSON.");
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Export JSON
+      document.getElementById("exportBtn").addEventListener("click", () => {
+        const dataStr = JSON.stringify(songs, null, 2);
+        const blob = new Blob([dataStr], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "kpop_songs_export.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+
+      // Dnes
+      document.getElementById("todayBtn").addEventListener("click", () => {
+        viewDate = new Date();
+        viewDate.setDate(1);
+        updateView();
+      });
+    });
+  </script>
+</body>
+</html>
