@@ -97,7 +97,7 @@
     ];
 
     // attempt to fetch external JSON (kpop_songs.json)
-    fetch("kpop_songs.json")
+    fetch("https://kxpopcz.github.io/kxpopcalendar/kpop_songs.json")
       .then(r => { if (!r.ok) throw new Error("Nenalezen kpop_songs.json"); return r.json(); })
       .then(arr => {
         if (Array.isArray(arr) && arr.length > 0) {
