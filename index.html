@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>K-Pop Release Calendar — with external JSON</title>
+  <title>K-Pop Release Calendar — with embedded JSON</title>
   <style>
     :root{
       --bg:#071021; --muted:#9aa6b2; --text:#eef6fb; --accent:#e1508a;
@@ -22,8 +22,8 @@
     .month-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
     .weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;color:var(--muted);font-size:12px;margin-bottom:6px;text-transform:uppercase;}
     .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-    .day{background:rgba(255,255,255,0.01);min-height:74px;padding:8px;border-radius:8px;position:relative;overflow:hidden;border:1px solid transparent;cursor:pointer;}
-    .day.inactive{opacity:0.26; cursor:default;}
+    .day{background:rgba(255,255,255,0.01);min-height:74px;padding:8px;border-radius:8px;position:relative;overflow:hidden;border:1px solid transparent;}
+    .day.inactive{opacity:0.26;}
     .day .num{font-size:13px;font-weight:700;}
     .marker{width:8px;height:8px;border-radius:50%;background:#ffdd57;position:absolute;right:8px;top:8px;}
     .day.today{outline:2px solid rgba(225,80,138,0.14);box-shadow:0 6px 18px rgba(225,80,138,0.06);border-color:rgba(225,80,138,0.12);}
@@ -35,7 +35,6 @@
     .meta{color:var(--muted);font-size:13px;}
     .hint{color:var(--muted);font-size:12px;margin-top:auto;}
     a { color:var(--accent); text-decoration:none; }
-    a:hover { text-decoration:underline; }
     @media(max-width:920px){.calendar-wrap{grid-template-columns:1fr;} .panel{order:2;}}
   </style>
 </head>
@@ -67,143 +66,75 @@
       <main class="calendar-wrap">
         <section class="calendar" aria-label="Kalendář">
           <div class="month-row">
-            <button id="prev" aria-label="Předchozí měsíc">◀</button>
-            <div id="monthLabel" aria-live="polite" aria-atomic="true">—</div>
-            <button id="next" aria-label="Následující měsíc">▶</button>
+            <button id="prev">◀</button>
+            <div id="monthLabel">—</div>
+            <button id="next">▶</button>
           </div>
 
           <div class="weekdays" aria-hidden="true">
             <div>Po</div><div>Út</div><div>St</div><div>Čt</div><div>Pá</div><div>So</div><div>Ne</div>
           </div>
 
-          <div class="grid" id="grid" role="grid" aria-label="Dny v měsíci"></div>
+          <div class="grid" id="grid"></div>
         </section>
 
         <aside class="panel" aria-label="Seznam písní">
           <h2 id="panelTitle">Vyber den</h2>
           <div class="meta" id="panelMeta">Vyber datum v kalendáři vlevo.</div>
           <div id="songList" role="list"></div>
-          <div class="hint">Formát JSON položky: <code>{ "title", "artist", "release_date": "YYYY-MM-DD", "generation": n, "youtube": "URL", "spotify": "URL" }</code></div>
+          <div class="hint">Formát JSON položky: <code>{ "title","artist","release_date":"YYYY-MM-DD","generation":n,"youtube":"URL","spotify":"URL" }</code></div>
         </aside>
       </main>
     </div>
   </div>
 
   <script>
-    // Vestavěné demo, pokud není externí JSON dostupný
+    // JSON data přímo v JS
     let songs = [
-      { title:"G.N.O.", artist:"Wonder Girls", release_date:"2011-11-07", generation:2, youtube:"https://youtu.be/ttJpY9pmSO8" },
-      { title:"Gee", artist:"Girls' Generation", release_date:"2009-01-05", generation:2, youtube:"https://youtu.be/U7mPqycQ0tQ" },
-      { title:"Like OOH-AHH", artist:"TWICE", release_date:"2015-10-20", generation:3, youtube:"https://youtu.be/0rtV5esQT6I" }
-    ];
-
-    // Pokus načíst externí JSON soubor kpop_songs.json (pokud existuje)
-    fetch("kpop_songs.json")
-      .then(r => {
-        if (!r.ok) throw new Error("Nenalezen kpop_songs.json");
-        return r.json();
-      })
-      .then(arr => {
-        if (Array.isArray(arr) && arr.length > 0) {
-          // Přidáme externí data před vestavěná, aby externí byla priorita
-          songs = arr.concat(songs);
-          buildMapFromArray(songs);
-          renderCalendar(viewDate);
-        }
-      })
-      .catch(() => {
-        // Pokud načtení selže, použijeme vestavěná data
-        buildMapFromArray(songs);
-        renderCalendar(viewDate);
-      });
-
-    // Mapování podle měsíce-den, pro rychlé hledání
-    const mdMap = new Map();
-    function buildMapFromArray(arr){
-      mdMap.clear();
-      for (const s of arr){
-        if (!s.release_date) continue;
-        const [y,m,d] = s.release_date.split("-").map(Number);
-        if (!m || !d) continue;
-        const key = `${m}-${d}`;
-        if (!mdMap.has(key)) mdMap.set(key, []);
-        mdMap.get(key).push(s);
-      }
-    }
-
-    // Stav a UI reference
-    let viewDate = new Date();
-    const monthNames = ["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
-    const monthLabel = document.getElementById("monthLabel");
-    const grid = document.getElementById("grid");
-    const panelTitle = document.getElementById("panelTitle");
-    const panelMeta = document.getElementById("panelMeta");
-    const songList = document.getElementById("songList");
-    const genSelect = document.getElementById("genSelect");
-    const todayBtn = document.getElementById("todayBtn");
-
-    // Vykreslení kalendáře pro zvolený měsíc a rok
-    function renderCalendar(date){
-      grid.innerHTML = "";
-      const y = date.getFullYear();
-      const m = date.getMonth();
-      monthLabel.textContent = monthNames[m] + " " + y;
-
-      const first = new Date(y, m, 1);
-      // Přepočet dne v týdnu (Po = 0)
-      const firstWeekday = (first.getDay() + 6) % 7;
-      const daysInMonth = new Date(y, m+1, 0).getDate();
-      const prevBlanks = firstWeekday;
-      const totalSlots = Math.ceil((prevBlanks + daysInMonth) / 7) * 7;
-      const genFilter = genSelect.value;
-
-      const today = new Date();
-      const todayKey = `${today.getMonth()+1}-${today.getDate()}`;
-
-      for (let i=0;i<totalSlots;i++){
-        const el = document.createElement("div");
-        el.className = "day";
-        const dayNum = i - prevBlanks + 1;
-        if (dayNum <= 0 || dayNum > daysInMonth){
-          el.classList.add("inactive");
-          const num = document.createElement("div"); num.className="num"; num.textContent = "";
-          el.appendChild(num);
-        } else {
-          const num = document.createElement("div"); num.className="num"; num.textContent = dayNum;
-          el.appendChild(num);
-          const key = `${m+1}-${dayNum}`;
-          const matches = mdMap.get(key) || [];
-          // Filtrování podle generace
-          const filtered = matches.filter(s => genFilter === "all" ? true : String(s.generation) === genFilter);
-
-          if (filtered.length > 0){
-            const marker = document.createElement("div"); marker.className="marker";
-            el.appendChild(marker);
-            const list = document.createElement("div"); list.className="songs";
-            filtered.slice(0,3).forEach(s => {
-              const r = document.createElement("div");
-              r.textContent = `${s.title} — ${s.artist}`;
-              if (s.youtube) {
-                const a = document.createElement("a");
-                a.href = s.youtube;
-                a.target = "_blank";
-                a.rel = "noopener noreferrer";
-                a.style.color = "var(--accent)";
-                a.style.marginLeft = "6px";
-                a.textContent = "[YT]";
-                r.appendChild(a);
-              }
-              list.appendChild(r);
-            });
-            if (filtered.length > 3){
-              const more = document.createElement("div"); 
-              more.textContent = `…a ${filtered.length-3} dalších`; 
-              more.style.color="var(--muted)"; 
-              more.style.fontSize="12px"; 
-              list.appendChild(more);
-            }
-            el.appendChild(list);
-          }
-
-          if (key === todayKey && dayNum === today.getDate() && (m === today.getMonth() && y === today.getFullYear())){
-            el.classList.add("today
+      { "release_date": "1998-01-01", "title": "To My Boyfriend", "artist": "Fin.K.L", "generation": 1, "youtube": "https://youtu.be/rNj-jnbB2bQ" },
+      { "release_date": "1999-11-01", "title": "I Know", "artist": "Sechs Kies", "generation": 1, "youtube": "https://youtu.be/1n1VJmGkWeE" },
+      { "release_date": "2000-03-03", "title": "Lies", "artist": "g.o.d", "generation": 1, "youtube": "https://youtu.be/QV5M8-P-wIg" },
+      { "release_date": "2000-07-15", "title": "Candy", "artist": "H.O.T.", "generation": 1, "youtube": "https://youtu.be/kx51aVuG8ig" },
+      { "release_date": "2001-05-25", "title": "Because I'm a Girl", "artist": "Kiss", "generation": 1, "youtube": "https://youtu.be/C1eovZUi8mM" },
+      { "release_date": "2002-11-13", "title": "My Name", "artist": "BoA", "generation": 1, "youtube": "https://youtu.be/XN0m8V5THI4" },
+      { "release_date": "2003-08-27", "title": "No More Terror", "artist": "Fly to the Sky", "generation": 1, "youtube": "https://youtu.be/WnjZFn2OX_E" },
+      { "release_date": "2004-04-14", "title": "My Love", "artist": "Lee Seung Gi", "generation": 1, "youtube": "https://youtu.be/lf6tNxxpH-I" },
+      { "release_date": "2005-01-20", "title": "U-Go-Girl", "artist": "Lee Hyori", "generation": 1, "youtube": "https://youtu.be/Hmf2E67SJUg" },
+      { "release_date": "2006-06-07", "title": "Love Like This", "artist": "SS501", "generation": 2, "youtube": "https://youtu.be/4FEm0b7reH4" },
+      { "release_date": "2007-07-01", "title": "Tell Me", "artist": "Wonder Girls", "generation": 2, "youtube": "https://youtu.be/blxNPZHtp5g" },
+      { "release_date": "2008-02-26", "title": "Mirotic", "artist": "TVXQ", "generation": 2, "youtube": "https://youtu.be/Qtgu2oMJWVo" },
+      { "release_date": "2009-01-05", "title": "Gee", "artist": "Girls' Generation", "generation": 2, "youtube": "https://youtu.be/U7mPqycQ0tQ" },
+      { "release_date": "2009-07-01", "title": "I Don't Care", "artist": "2NE1", "generation": 2, "youtube": "https://youtu.be/6SwiSpudKWI" },
+      { "release_date": "2010-02-18", "title": "Oh!", "artist": "Girls' Generation", "generation": 2, "youtube": "https://youtu.be/Tk6m6h7dH_Y" },
+      { "release_date": "2010-09-09", "title": "Lucifer", "artist": "SHINee", "generation": 2, "youtube": "https://youtu.be/Dww9UjJ4Dt8" },
+      { "release_date": "2011-11-07", "title": "G.N.O.", "artist": "Wonder Girls", "generation": 2, "youtube": "https://youtu.be/ttJpY9pmSO8" },
+      { "release_date": "2012-06-28", "title": "Electric Shock", "artist": "f(x)", "generation": 2, "youtube": "https://youtu.be/n8I8QGFA1oM" },
+      { "release_date": "2012-09-06", "title": "Gangnam Style", "artist": "PSY", "generation": 2, "youtube": "https://youtu.be/9bZkp7q19f0" },
+      { "release_date": "2013-01-08", "title": "I Got A Boy", "artist": "Girls' Generation", "generation": 2, "youtube": "https://youtu.be/wq7ftOZBy0E" },
+      { "release_date": "2013-06-03", "title": "Wolf", "artist": "EXO", "generation": 3, "youtube": "https://youtu.be/mM0-ZU8njdo" },
+      { "release_date": "2013-11-21", "title": "Growl", "artist": "EXO", "generation": 3, "youtube": "https://youtu.be/qrO4YZeyl0I" },
+      { "release_date": "2014-02-27", "title": "Come Back Home", "artist": "2NE1", "generation": 2, "youtube": "https://youtu.be/vLbfv-AAyvQ" },
+      { "release_date": "2015-07-20", "title": "Party", "artist": "Girls' Generation", "generation": 2, "youtube": "https://youtu.be/0k2Zzkw_-0I" },
+      { "release_date": "2015-10-23", "title": "4 Walls", "artist": "f(x)", "generation": 2, "youtube": "https://youtu.be/4j7Umwfx60Q" },
+      { "release_date": "2015-11-03", "title": "Like OOH-AHH", "artist": "TWICE", "generation": 3, "youtube": "https://youtu.be/0rtV5esQT6I" },
+      { "release_date": "2016-05-02", "title": "Cheer Up", "artist": "TWICE", "generation": 3, "youtube": "https://youtu.be/c7rCyll5AeY" },
+      { "release_date": "2016-10-30", "title": "TT", "artist": "TWICE", "generation": 3, "youtube": "https://youtu.be/ePpPVE-GGJw" },
+      { "release_date": "2017-06-22", "title": "As If It's Your Last", "artist": "BLACKPINK", "generation": 3, "youtube": "https://youtu.be/Amq-qlqbjYA" },
+      { "release_date": "2017-09-18", "title": "DNA", "artist": "BTS", "generation": 3, "youtube": "https://youtu.be/MBdVXkSdhwU" },
+      { "release_date": "2018-08-06", "title": "IDOL", "artist": "BTS", "generation": 3, "youtube": "https://youtu.be/pBuZEGYXA6E" },
+      { "release_date": "2018-10-18", "title": "Tempo", "artist": "EXO", "generation": 3, "youtube": "https://youtu.be/wvQ3fSLEagQ" },
+      { "release_date": "2019-04-05", "title": "Kill This Love", "artist": "BLACKPINK", "generation": 3, "youtube": "https://youtu.be/2S24-y0Ij3Y" },
+      { "release_date": "2019-12-26", "title": "Obsession", "artist": "EXO", "generation": 3, "youtube": "https://youtu.be/uxmP4b2a0uY" },
+      { "release_date": "2020-02-21", "title": "ON", "artist": "BTS", "generation": 3, "youtube": "https://youtu.be/mPVDGOVjRQ0" },
+      { "release_date": "2020-08-03", "title": "Dumhdurum", "artist": "Apink", "generation": 3, "youtube": "https://youtu.be/gU2HZqS0jzI" },
+      { "release_date": "2020-08-20", "title": "Dynamite", "artist": "BTS", "generation": 3, "youtube": "https://youtu.be/gdZLi9oWNZg" },
+      { "release_date": "2021-05-21", "title": "Next Level", "artist": "aespa", "generation": 4, "youtube": "https://youtu.be/4TWR90KJl84" },
+      { "release_date": "2021-12-17", "title": "Eleven", "artist": "IVE", "generation": 4, "youtube": "https://youtu.be/--FmExEAsM8" },
+      { "release_date": "2022-01-10", "title": "Butterfly", "artist": "LOONA", "generation": 4, "youtube": "https://youtu.be/FqHMywEqQZM" },
+      { "release_date": "2022-03-14", "title": "MAGO", "artist": "GFRIEND", "generation": 4, "youtube": "https://youtu.be/4kjIgPmh8k8" },
+      { "release_date": "2022-08-01", "title": "Girls", "artist": "aespa", "generation": 4, "youtube": "https://youtu.be/OXG7h3aYl0I" },
+      { "release_date": "2022-08-05", "title": "Pink Venom", "artist": "BLACKPINK", "generation": 3, "youtube": "https://youtu.be/gQlMMD8auMs" },
+      { "release_date": "2023-02-25", "title": "Attention", "artist": "NewJeans", "generation": 4, "youtube": "https://youtu.be/5nEpcTxGSF0" },
+      { "release_date": "2023-05-08", "title": "Spicy", "artist": "aespa", "generation": 4, "youtube": "https://youtu.be/Os_heh8vPfs" },
+      { "release_date": "2023-07-07", "title": "Super Shy", "artist": "NewJeans", "generation": 4, "youtube": "https://youtu.be/ArmDp-zijuc" },
+      { "release_date": "2023-07-21", "title": "ETA", "artist": "NewJeans", "generation": 4, "youtube": "https://
