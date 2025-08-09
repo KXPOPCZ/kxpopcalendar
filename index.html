@@ -22,8 +22,8 @@
     .month-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
     .weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;color:var(--muted);font-size:12px;margin-bottom:6px;text-transform:uppercase;}
     .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-    .day{background:rgba(255,255,255,0.01);min-height:74px;padding:8px;border-radius:8px;position:relative;overflow:hidden;border:1px solid transparent;}
-    .day.inactive{opacity:0.26;}
+    .day{background:rgba(255,255,255,0.01);min-height:74px;padding:8px;border-radius:8px;position:relative;overflow:hidden;border:1px solid transparent;cursor:pointer;}
+    .day.inactive{opacity:0.26; cursor:default;}
     .day .num{font-size:13px;font-weight:700;}
     .marker{width:8px;height:8px;border-radius:50%;background:#ffdd57;position:absolute;right:8px;top:8px;}
     .day.today{outline:2px solid rgba(225,80,138,0.14);box-shadow:0 6px 18px rgba(225,80,138,0.06);border-color:rgba(225,80,138,0.12);}
@@ -35,6 +35,7 @@
     .meta{color:var(--muted);font-size:13px;}
     .hint{color:var(--muted);font-size:12px;margin-top:auto;}
     a { color:var(--accent); text-decoration:none; }
+    a:hover { text-decoration:underline; }
     @media(max-width:920px){.calendar-wrap{grid-template-columns:1fr;} .panel{order:2;}}
   </style>
 </head>
@@ -66,53 +67,57 @@
       <main class="calendar-wrap">
         <section class="calendar" aria-label="Kalendář">
           <div class="month-row">
-            <button id="prev">◀</button>
-            <div id="monthLabel">—</div>
-            <button id="next">▶</button>
+            <button id="prev" aria-label="Předchozí měsíc">◀</button>
+            <div id="monthLabel" aria-live="polite" aria-atomic="true">—</div>
+            <button id="next" aria-label="Následující měsíc">▶</button>
           </div>
 
           <div class="weekdays" aria-hidden="true">
             <div>Po</div><div>Út</div><div>St</div><div>Čt</div><div>Pá</div><div>So</div><div>Ne</div>
           </div>
 
-          <div class="grid" id="grid"></div>
+          <div class="grid" id="grid" role="grid" aria-label="Dny v měsíci"></div>
         </section>
 
         <aside class="panel" aria-label="Seznam písní">
           <h2 id="panelTitle">Vyber den</h2>
           <div class="meta" id="panelMeta">Vyber datum v kalendáři vlevo.</div>
           <div id="songList" role="list"></div>
-          <div class="hint">Formát JSON položky: <code>{ "title","artist","release_date":"YYYY-MM-DD","generation":n,"youtube":"URL","spotify":"URL" }</code></div>
+          <div class="hint">Formát JSON položky: <code>{ "title", "artist", "release_date": "YYYY-MM-DD", "generation": n, "youtube": "URL", "spotify": "URL" }</code></div>
         </aside>
       </main>
     </div>
   </div>
 
   <script>
-    // vestavěné záložní demo (pokud kpop_songs.json není dostupný)
+    // Vestavěné demo, pokud není externí JSON dostupný
     let songs = [
       { title:"G.N.O.", artist:"Wonder Girls", release_date:"2011-11-07", generation:2, youtube:"https://youtu.be/ttJpY9pmSO8" },
       { title:"Gee", artist:"Girls' Generation", release_date:"2009-01-05", generation:2, youtube:"https://youtu.be/U7mPqycQ0tQ" },
       { title:"Like OOH-AHH", artist:"TWICE", release_date:"2015-10-20", generation:3, youtube:"https://youtu.be/0rtV5esQT6I" }
     ];
 
-    // attempt to fetch external JSON (kpop_songs.json)
-    fetch("https://kxpopcz.github.io/kxpopcalendar/kpop_songs.json")
-      .then(r => { if (!r.ok) throw new Error("Nenalezen kpop_songs.json"); return r.json(); })
+    // Pokus načíst externí JSON soubor kpop_songs.json (pokud existuje)
+    fetch("kpop_songs.json")
+      .then(r => {
+        if (!r.ok) throw new Error("Nenalezen kpop_songs.json");
+        return r.json();
+      })
       .then(arr => {
         if (Array.isArray(arr) && arr.length > 0) {
-          // merge: external first, then built-ins
+          // Přidáme externí data před vestavěná, aby externí byla priorita
           songs = arr.concat(songs);
           buildMapFromArray(songs);
           renderCalendar(viewDate);
         }
       })
-      .catch(err => {
-        // console.log("External JSON not loaded:", err.message);
+      .catch(() => {
+        // Pokud načtení selže, použijeme vestavěná data
         buildMapFromArray(songs);
         renderCalendar(viewDate);
       });
 
+    // Mapování podle měsíce-den, pro rychlé hledání
     const mdMap = new Map();
     function buildMapFromArray(arr){
       mdMap.clear();
@@ -126,7 +131,7 @@
       }
     }
 
-    // state & UI refs
+    // Stav a UI reference
     let viewDate = new Date();
     const monthNames = ["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
     const monthLabel = document.getElementById("monthLabel");
@@ -137,6 +142,7 @@
     const genSelect = document.getElementById("genSelect");
     const todayBtn = document.getElementById("todayBtn");
 
+    // Vykreslení kalendáře pro zvolený měsíc a rok
     function renderCalendar(date){
       grid.innerHTML = "";
       const y = date.getFullYear();
@@ -144,6 +150,7 @@
       monthLabel.textContent = monthNames[m] + " " + y;
 
       const first = new Date(y, m, 1);
+      // Přepočet dne v týdnu (Po = 0)
       const firstWeekday = (first.getDay() + 6) % 7;
       const daysInMonth = new Date(y, m+1, 0).getDate();
       const prevBlanks = firstWeekday;
@@ -166,6 +173,7 @@
           el.appendChild(num);
           const key = `${m+1}-${dayNum}`;
           const matches = mdMap.get(key) || [];
+          // Filtrování podle generace
           const filtered = matches.filter(s => genFilter === "all" ? true : String(s.generation) === genFilter);
 
           if (filtered.length > 0){
@@ -174,17 +182,16 @@
             const list = document.createElement("div"); list.className="songs";
             filtered.slice(0,3).forEach(s => {
               const r = document.createElement("div");
+              r.textContent = `${s.title} — ${s.artist}`;
               if (s.youtube) {
                 const a = document.createElement("a");
                 a.href = s.youtube;
                 a.target = "_blank";
+                a.rel = "noopener noreferrer";
                 a.style.color = "var(--accent)";
                 a.style.marginLeft = "6px";
                 a.textContent = "[YT]";
-                r.textContent = `${s.title} — ${s.artist} `;
                 r.appendChild(a);
-              } else {
-                r.textContent = `${s.title} — ${s.artist}`;
               }
               list.appendChild(r);
             });
@@ -199,109 +206,4 @@
           }
 
           if (key === todayKey && dayNum === today.getDate() && (m === today.getMonth() && y === today.getFullYear())){
-            el.classList.add("today");
-          }
-
-          el.addEventListener("click", ()=> showSongsFor(m+1, dayNum, filtered, key));
-        }
-        grid.appendChild(el);
-      }
-    }
-
-    function showSongsFor(month, day, filtered, key){
-      const niceDate = `${String(day).padStart(2,"0")}.${String(month).padStart(2,"0")}`;
-      panelTitle.textContent = `Singly vydané ${niceDate}`;
-      const genFilter = genSelect.value;
-      panelMeta.textContent = genFilter === "all" ? `Všechny generace — ${niceDate}` : `Filtr: ${genFilter}. generace — ${niceDate}`;
-      songList.innerHTML = "";
-
-      let list = filtered;
-      if (!list){
-        const matches = mdMap.get(`${month}-${day}`) || [];
-        list = matches.filter(s => genFilter === "all" ? true : String(s.generation) === genFilter);
-      }
-      if (list.length === 0){
-        songList.innerHTML = `<div style="color:var(--muted);font-size:13px">Žádné záznamy pro tento den (vybraná generace).</div>`;
-        return;
-      }
-
-      list.sort((a,b) => {
-        const ya = parseInt((a.release_date||"").split("-")[0]||0), yb = parseInt((b.release_date||"").split("-")[0]||0);
-        return yb - ya;
-      });
-
-      list.forEach(s => {
-        const el = document.createElement("div"); el.className = "song"; el.setAttribute("role","listitem");
-        const left = document.createElement("div"); left.className="left"; left.textContent = (s.release_date||"").split("-")[0] || "";
-        const body = document.createElement("div"); body.style.flex="1";
-        const title = document.createElement("div"); title.className="title"; title.textContent = s.title;
-        const artist = document.createElement("div"); artist.style.color="var(--muted)"; artist.textContent = `${s.artist} • gen ${s.generation}`;
-        const links = document.createElement("div"); links.style.marginTop="6px";
-        if (s.youtube) {
-          const a = document.createElement("a"); a.href = s.youtube; a.target="_blank"; a.textContent="YouTube"; a.style.marginRight="10px";
-          links.appendChild(a);
-        }
-        if (s.spotify) {
-          const b = document.createElement("a"); b.href = s.spotify; b.target="_blank"; b.textContent="Spotify";
-          links.appendChild(b);
-        }
-        body.appendChild(title); body.appendChild(artist); body.appendChild(links);
-        el.appendChild(left); el.appendChild(body);
-        songList.appendChild(el);
-      });
-    }
-
-    // nav & controls
-    document.getElementById("prev").addEventListener("click", ()=> { viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth()-1, 1); renderCalendar(viewDate); clearPanel();});
-    document.getElementById("next").addEventListener("click", ()=> { viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 1); renderCalendar(viewDate); clearPanel();});
-    todayBtn.addEventListener("click", ()=> { viewDate = new Date(); renderCalendar(viewDate); });
-    genSelect.addEventListener("change", ()=> { renderCalendar(viewDate); clearPanel(); });
-
-    function clearPanel(){ panelTitle.textContent="Vyber den"; panelMeta.textContent="Vyber datum v kalendáři vlevo."; songList.innerHTML=""; }
-
-    // import JSON via file input
-    const fileInput = document.getElementById("fileInput");
-    fileInput.addEventListener("change", e => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const r = new FileReader();
-      r.onload = ev => {
-        try {
-          const imported = JSON.parse(ev.target.result);
-          if (!Array.isArray(imported)) throw new Error("JSON musí být pole objektů.");
-          const sanitized = imported.map(it => ({
-            title: it.title || it.name || "unknown",
-            artist: it.artist || it.group || "unknown",
-            release_date: it.release_date || it.date || "",
-            generation: Number(it.generation) || 0,
-            youtube: it.youtube || it.yt || it.youtube_url || "",
-            spotify: it.spotify || it.spotify_url || ""
-          }));
-          sanitized.forEach(s => songs.push(s));
-          buildMapFromArray(songs);
-          alert("Import dokončen — databáze rozšířena o " + sanitized.length + " položek.");
-          renderCalendar(viewDate); clearPanel();
-          fileInput.value = "";
-        } catch (err) {
-          alert("Chyba při importu: " + err.message);
-        }
-      };
-      r.readAsText(f);
-    });
-
-    // export DB
-    document.getElementById("exportBtn").addEventListener("click", ()=> {
-      const blob = new Blob([JSON.stringify(songs, null, 2)], {type:"application/json"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = "kpop_songs_export.json";
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    });
-
-    // initial build if external wasn't loaded
-    buildMapFromArray(songs);
-    renderCalendar(viewDate);
-
-  </script>
-</body>
-</html>
+            el.classList.add("today
