@@ -35,6 +35,11 @@
     .meta{color:var(--muted);font-size:13px;}
     .hint{color:var(--muted);font-size:12px;margin-top:auto;}
     @media(max-width:920px){.calendar-wrap{grid-template-columns:1fr;} .panel{order:2;}}
+.day.selected {
+  outline: 2px solid var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  border-color: var(--accent);
+}
   </style>
 </head>
 <body>
@@ -178,6 +183,7 @@
     const genSelect = document.getElementById("genSelect");
     const todayBtn = document.getElementById("todayBtn");
 
+let selectedDayEl = null;
     function renderCalendar(date){
       grid.innerHTML = "";
       const y = date.getFullYear();
@@ -228,7 +234,13 @@
             el.classList.add("today");
           }
 
-          el.addEventListener("click", ()=> showSongsFor(m+1, dayNum, filtered, key));
+          el.addEventListener("click", () => {
+  if (selectedDayEl) selectedDayEl.classList.remove("selected");
+  el.classList.add("selected");
+  selectedDayEl = el;
+
+  showSongsFor(m + 1, dayNum, filtered, key);
+});
         }
         grid.appendChild(el);
       }
