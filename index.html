@@ -18,6 +18,13 @@
     select,input[type="file"],button{background:rgba(255,255,255,0.02); color:var(--text); border:1px solid rgba(255,255,255,0.04); padding:8px;border-radius:8px;font-size:13px;}
     button{cursor:pointer;}
     .calendar-wrap{display:grid;grid-template-columns:1fr 360px;gap:14px;}
+.calendar {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  transition: background-image 0.5s ease-in-out;
+  box-shadow: inset 0 0 0 1000px rgba(7, 24, 39, 0.75);
+}
     .calendar{padding:12px;border-radius:10px;}
     .month-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
     .weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;color:var(--muted);font-size:12px;margin-bottom:6px;text-transform:uppercase;}
@@ -156,6 +163,15 @@
       { title:"Bon Bon Chocolat", artist:"EVERGLOW", release_date:"2019-03-18", generation:4, youtube:"https://youtu.be/HvGql8HwOIM" },
       { title:"Blue & Grey", artist:"BTS", release_date:"2020-11-20", generation:4, youtube:"https://youtu.be/t3g0M9Q1Udo" }
     ];
+const artistBackgrounds = {
+  "Girls' Generation": "https://github.com/KXPOPCZ/kxpopcalendar/blob/main/GirlsGeneration.jpg",
+  "Wonder Girls": "https://tvujgithub.com/images/wonder_girls.jpg",
+  "BLACKPINK": "https://tvujgithub.com/images/blackpink.jpg",
+  "TWICE": "https://tvujgithub.com/images/twice.jpg",
+  "BTS": "https://tvujgithub.com/images/bts.jpg",
+  // další podle potřeby
+};
+
 
     /* Build map month-day => songs array */
     const mdMap = new Map();
@@ -240,7 +256,23 @@ let selectedDayEl = null;
   selectedDayEl = el;
 
   showSongsFor(m + 1, dayNum, filtered, key);
-});
+})
+const calendarEl = document.querySelector(".calendar");
+
+// vybereme první interpreta z písní, který má obrázek
+let bgUrl = "";
+for (const song of filtered) {
+  if (artistBackgrounds[song.artist]) {
+    bgUrl = artistBackgrounds[song.artist];
+    break;
+  }
+}
+
+if (bgUrl) {
+  calendarEl.style.backgroundImage = `url('${bgUrl}')`;
+} else {
+  calendarEl.style.backgroundImage = ""; // reset pokud nic není
+};
         }
         grid.appendChild(el);
       }
